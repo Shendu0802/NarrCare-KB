@@ -1,13 +1,21 @@
 """Debug API endpoints: GET /debug/status, GET /debug/query."""
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, JSONResponse
 from src.config import settings
 from src.db.connection import Database
 from src.db.repository import KnowledgeUnitRepository
 
 router = APIRouter(prefix="/debug", tags=["debug"])
-templates = Jinja2Templates(directory="src/debug/templates")
+
+_templates = None
+
+
+def _get_templates():
+    global _templates
+    if _templates is None:
+        from fastapi.templating import Jinja2Templates
+        _templates = Jinja2Templates(directory="src/debug/templates")
+    return _templates
 
 
 @router.get("/status")
@@ -56,4 +64,8 @@ async def debug_status():
 
 @router.get("/query", response_class=HTMLResponse)
 async def debug_query_page(request: Request):
-    return templates.TemplateResponse("debug.html", {"request": request})
+    try:
+        templates = _get_templates()
+        return templates.TemplateResponse("debug.html", {"request": request})
+    except Exception:
+        return JSONResponse({"error": "Debug UI unavailable — jinja2 may not be installed"}, status_code=500)

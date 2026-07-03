@@ -6,8 +6,8 @@ class TestLLMConfig:
     def test_defaults(self):
         config = LLMConfig(api_key="test-key")
         assert config.base_url == "https://api.deepseek.com/v1"
-        assert config.model == "deepseek-chat"
-        assert config.timeout == 60
+        assert config.model == "deepseek-v4-flash"
+        assert config.timeout == 90
         assert config.max_retries == 2
 
     def test_custom(self):
