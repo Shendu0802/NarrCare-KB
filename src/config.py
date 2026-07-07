@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "deepseek-chat"
     llm_timeout: int = 60
+    # Embedding API (separate from LLM — e.g., Qwen for embeddings, DeepSeek for chat)
+    embedding_api_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    embedding_api_key: str = ""
+    embedding_api_model: str = "text-embedding-v3"
     dense_top_k: int = 50
     sparse_top_k: int = 30
     metadata_top_k: int = 20

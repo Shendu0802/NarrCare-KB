@@ -64,3 +64,34 @@ class KnowledgeUnitRepository:
             (query, limit),
         ).fetchall()
         return [dict(r) for r in rows]
+
+    def update_enrichment(
+        self, ku_id: str, summary: str = "",
+        semantic_tags: list | None = None, scenario_tags: list | None = None,
+        role_tags: list | None = None, method_tags: list | None = None,
+        risk_levels: list | None = None, card_targets: list | None = None,
+        contraindications: list | None = None,
+    ) -> None:
+        """Update only enrichment columns — safe partial update, no row replacement."""
+        import json
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        self.db.conn.execute(
+            """UPDATE knowledge_units
+               SET summary = ?, semantic_tags = ?, scenario_tags = ?, role_tags = ?,
+                   method_tags = ?, risk_levels = ?, card_targets = ?,
+                   contraindications = ?, updated_at = ?
+               WHERE id = ?""",
+            (
+                summary,
+                json.dumps(semantic_tags or [], ensure_ascii=False),
+                json.dumps(scenario_tags or [], ensure_ascii=False),
+                json.dumps(role_tags or [], ensure_ascii=False),
+                json.dumps(method_tags or [], ensure_ascii=False),
+                json.dumps(risk_levels or [], ensure_ascii=False),
+                json.dumps(card_targets or [], ensure_ascii=False),
+                json.dumps(contraindications or [], ensure_ascii=False),
+                now, ku_id,
+            ),
+        )
+        self.db.conn.commit()

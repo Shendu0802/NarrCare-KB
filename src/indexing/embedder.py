@@ -44,11 +44,11 @@ class Embedder:
             from openai import OpenAI
             from src.config import settings
             self._client = OpenAI(
-                base_url=settings.llm_base_url,
-                api_key=settings.llm_api_key or None,
+                base_url=settings.embedding_api_url,
+                api_key=settings.embedding_api_key or None,
                 timeout=settings.llm_timeout,
             )
-            self._api_model = "text-embedding-v3"  # Qwen embedding model
+            self._api_model = settings.embedding_api_model
             self._api_dim = 1024
             return True
         except Exception:
