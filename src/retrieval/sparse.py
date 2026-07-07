@@ -1,6 +1,11 @@
-"""FTS5 sparse recall with jieba tokenization."""
-import jieba
+"""FTS5 sparse recall with optional jieba tokenization."""
 from src.config import settings
+
+try:
+    import jieba
+    _has_jieba = True
+except ImportError:
+    _has_jieba = False
 
 
 class SparseRecaller:
@@ -13,7 +18,10 @@ class SparseRecaller:
         seen = set()
         results = []
         for query in queries:
-            tokens = " ".join(jieba.cut(query))
+            if _has_jieba:
+                tokens = " ".join(jieba.cut(query))
+            else:
+                tokens = query
             try:
                 hits = self.text_index.search(tokens, limit=top_k)
             except Exception:

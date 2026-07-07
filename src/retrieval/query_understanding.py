@@ -50,7 +50,7 @@ class QueryUnderstanding:
             role_focus=result.get("role_focus", []),
             risk_signals=result.get("risk_signals", []),
             contraindication_signals=result.get("contraindication_signals", []),
-            rewritten_queries=result.get("rewritten_queries", [patient_text]),
+            rewritten_queries=result.get("rewritten_queries") or [patient_text],
         )
 
     def analyze_sync(self, patient_text: str, family_text: str = "", **kwargs) -> QueryAnalysis:

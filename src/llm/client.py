@@ -7,9 +7,9 @@ class LLMConfig(BaseModel):
     """Configuration for an OpenAI-compatible LLM endpoint."""
 
     base_url: str = "https://api.deepseek.com/v1"
-    api_key: str = ""
-    model: str = "deepseek-chat"
-    timeout: int = 60
+    api_key: str = "sk-6962132f5d174473ae6a078e7c4c320d"
+    model: str = "deepseek-v4-flash"
+    timeout: int = 90
     max_retries: int = 2
 
 
