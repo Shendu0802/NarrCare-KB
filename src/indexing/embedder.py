@@ -45,10 +45,11 @@ class Embedder:
             from src.config import settings
             self._client = OpenAI(
                 base_url=settings.llm_base_url,
-                api_key=settings.llm_api_key,
+                api_key=settings.llm_api_key or None,
                 timeout=settings.llm_timeout,
             )
-            self._api_model = settings.llm_model
+            self._api_model = "text-embedding-v3"  # Qwen embedding model
+            self._api_dim = 1024
             return True
         except Exception:
             return False
@@ -77,7 +78,10 @@ class Embedder:
         all_embs = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
-            resp = self._client.embeddings.create(model=self._api_model, input=batch)
+            resp = self._client.embeddings.create(
+                model=self._api_model, input=batch,
+                dimensions=getattr(self, '_api_dim', 1024),
+            )
             for item in resp.data:
                 all_embs.append(np.array(item.embedding, dtype=np.float32))
         result = np.stack(all_embs)
