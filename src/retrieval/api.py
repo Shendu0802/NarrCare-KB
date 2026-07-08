@@ -74,8 +74,16 @@ async def retrieve(request: RetrieveRequest):
         if unit:
             unit_lookup[uid] = unit
 
-    # Fuse and bundle
+    # Fuse
     fused = HybridFusion().fuse(dense_hits, sparse_hits, metadata_hits, safety_hits, unit_lookup)
+
+    # Rerank with LLM API (improves precision, no GPU needed)
+    try:
+        from src.retrieval.reranker import APIReranker
+        reranker = APIReranker(llm_client)
+        fused = reranker.rerank(query_analysis.rewritten_queries[0], fused, top_k=30)
+    except Exception:
+        pass  # Rerank failure is non-fatal
 
     from src.retrieval.bundler import Bundler
     bundle = Bundler().assemble(fused, unit_lookup, query_analysis,
