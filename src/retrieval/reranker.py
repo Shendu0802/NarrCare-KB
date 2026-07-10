@@ -51,7 +51,7 @@ class Qwen3Reranker:
 class APIReranker:
     """LLM API-based reranker — sends candidates to DeepSeek for relevance scoring.
 
-    No GPU needed. Sends top-N candidates to LLM with scoring prompt.
+    No GPU needed. Uses sync OpenAI client for simple thread-safe calling.
     """
 
     RERANK_PROMPT = """You are a clinical relevance judge. Rate each passage's relevance to the query on a scale of 0-10.
@@ -62,8 +62,28 @@ Passages:
 
 Return JSON only with key "scores" mapping to a list of integers, one per passage in order."""
 
-    def __init__(self, llm_client):
-        self.llm = llm_client
+    def __init__(self, llm_client_or_config=None):
+        from openai import OpenAI
+        if llm_client_or_config is None:
+            from src.config import settings
+            self._client = OpenAI(
+                base_url=settings.llm_base_url,
+                api_key=settings.llm_api_key,
+                timeout=settings.llm_timeout,
+            )
+            self._model = settings.llm_model
+        elif hasattr(llm_client_or_config, 'config'):
+            # LLMClient passed — extract config
+            c = llm_client_or_config.config
+            self._client = OpenAI(base_url=c.base_url, api_key=c.api_key, timeout=c.timeout)
+            self._model = c.model
+        else:
+            self._client = OpenAI(
+                base_url=llm_client_or_config.base_url,
+                api_key=llm_client_or_config.api_key,
+                timeout=llm_client_or_config.timeout,
+            )
+            self._model = llm_client_or_config.model
 
     def rerank(self, query: str, candidates: list[dict], top_k: int = 20) -> list[dict]:
         if not candidates:
@@ -75,25 +95,29 @@ Return JSON only with key "scores" mapping to a list of integers, one per passag
             snippet = (c.get("text") or c.get("snippet", ""))[:200]
             passages_text += f"[{i}] {snippet}\n"
 
-        messages = self.llm.build_messages(
-            system="You are a clinical relevance judge. Return JSON only.",
-            user=self.RERANK_PROMPT.format(query=query[:300], passages=passages_text),
-        )
+        prompt = self.RERANK_PROMPT.format(query=query[:300], passages=passages_text)
 
         try:
-            import asyncio, concurrent.futures
-            def _call():
-                return asyncio.run(self.llm.chat_with_json(messages, temperature=0.1, max_tokens=512))
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(_call)
-                result = future.result(timeout=30)
+            import json as _json
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": "You are a clinical relevance judge. Return JSON only."},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.1,
+                max_tokens=512,
+                response_format={"type": "json_object"},
+            )
+            text = response.choices[0].message.content or "{}"
+            result = _json.loads(text)
             scores = result.get("scores", [])
         except Exception:
             return self._fallback_rerank(candidates, top_k)
 
         # Apply scores
         for i, score in enumerate(scores[:len(batch)]):
-            batch[i]["rerank_score"] = float(score) / 10.0  # normalize to 0-1
+            batch[i]["rerank_score"] = float(score) / 10.0
             batch[i]["score"] = (
                 float(score) / 10.0 * settings.weight_rerank
                 + batch[i].get("score", 0.0)
@@ -109,12 +133,6 @@ Return JSON only with key "scores" mapping to a list of integers, one per passag
 
 
 # Factory
-def create_reranker(llm_client=None):
-    """Create the best available reranker. Prefers API if llm_client provided."""
-    if llm_client:
-        return APIReranker(llm_client)
-    # Try local model
-    local = Qwen3Reranker(f"{settings.models_dir}/{settings.reranker_model}", settings.embedding_device)
-    if local.load():
-        return local
-    return None
+def create_reranker(llm_config=None):
+    """Create the best available reranker. Uses API by default (no GPU needed)."""
+    return APIReranker(llm_config)

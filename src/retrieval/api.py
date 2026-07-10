@@ -77,13 +77,13 @@ async def retrieve(request: RetrieveRequest):
     # Fuse
     fused = HybridFusion().fuse(dense_hits, sparse_hits, metadata_hits, safety_hits, unit_lookup)
 
-    # Rerank with LLM API (improves precision, no GPU needed)
+    # Rerank with LLM API
     try:
-        from src.retrieval.reranker import APIReranker
-        reranker = APIReranker(llm_client)
+        from src.retrieval.reranker import create_reranker
+        reranker = create_reranker()
         fused = reranker.rerank(query_analysis.rewritten_queries[0], fused, top_k=30)
     except Exception:
-        pass  # Rerank failure is non-fatal
+        pass
 
     from src.retrieval.bundler import Bundler
     bundle = Bundler().assemble(fused, unit_lookup, query_analysis,
