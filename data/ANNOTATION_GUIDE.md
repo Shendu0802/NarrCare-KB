@@ -6,7 +6,9 @@
 
 ## 标注文件
 
-`data/contraindication_annotation.csv` — 910 条候选片段（通过关键词和标签筛选的高风险相关内容）
+`data/contraindication_annotation.csv` — **全部 5,441 条语义片段**（知识库中的所有 chunk）
+
+> 注意：大部分片段是正常的护理知识，不涉及禁忌。只有少数片段需要标注 contraindication。如果片段内容安全、不涉及任何风险，**留空即可**，无需填写。
 
 ## CSV 列说明
 
@@ -74,6 +76,18 @@ current_risk_levels: medium
 → annotated_risk_level: low
 → annotator_notes: 该片段属于一般性护理建议，风险low
 ```
+
+## 标注策略（先筛选，后精标）
+
+全量 5,441 条逐一阅读不现实。建议按以下流程操作：
+
+1. **在 Excel/WPS 中打开 CSV**，使用筛选功能
+2. **优先标注高风险关键词命中的行** — 在 `text_preview` 列筛选包含以下关键词的行：
+   - `自杀` `绝望` `想死` `结束` `吗啡` `呼吸抑制` `禁忌` `剂量` `插管` `拒绝治疗` `不治了`
+3. **优先标注高风险标签的行** — 在 `current_risk_levels` 列筛选 `high`
+4. **以上两类标注完成后即可返回**，其余 normal 内容不需逐个检查
+
+预计实际需要标注的量约 **300-500 条**，而非全部 5441 条。
 
 ## 标注注意事项
 
