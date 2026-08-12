@@ -13,12 +13,15 @@
 - 替代原有内置轻量 RAG 模块
 - 独立部署、独立评测、独立优化
 
-### 当前状态
+### 当前状态（2026-08-12 更新）
 | 维度 | 状态 |
 |------|------|
-| 整体进度 | Phase 1-7 全部实现 |
+| 整体进度 | Phase 1-7 全部实现，P1 部分完成 |
+| 总数据量 | 15,073 单元（5,441 书籍 + 6,228 指南/论文 + 3,404 知识卡片） |
+| LLM 增强 | 71%（pdf_book 99%，guideline 32%） |
 | 单元测试 | 28/28 passed |
-| 检索评测 | 40 条真实场景，Recall@10 = 1.0 |
+| 检索评测 | 40 条场景，7 指标，Recall@10=1.0, Tag=0.79, Card=0.96 |
+| Reranker | ✅ API 模式已集成 |
 | 可部署 | 是 |
 
 ---
@@ -139,12 +142,12 @@ NarrCare_KB/
 
 | 指标 | 数值 |
 |------|------|
-| 总 chunks | 5,441 |
-| 来源类型 | 全部 `pdf_book` |
+| 总单元数 | 15,073 |
+| semantic_chunks | 11,669（5,441 pdf_book + 6,012 guideline + 216 paper） |
+| knowledge_cards | 3,404 |
 | 来源状态 | 全部 `main`（无 candidate/quarantined） |
-| 单元类型 | 全部 `semantic_chunk`（无 knowledge_card） |
-| 标签状态 | **全部为空**（LLM 增强未运行） |
-| 文档数 | 10 本 |
+| 标签覆盖率 | 71%（pdf_book 99%, guideline 32%） |
+| 文档数 | 46（10 本书 + 36 份指南/论文） |
 
 ### 已导入的 10 本书籍
 
@@ -162,6 +165,16 @@ NarrCare_KB/
 | 直视骄阳：征服死亡恐惧 | 291 | 994 |
 
 > 所有 PDF 均为扫描版（无文本层），通过 easyocr CPU 模式识别（DPI 120，~4.7s/页）。
+
+### 已导入的 36 份指南/论文
+
+| 优先级 | 数量 | 示例 |
+|--------|------|------|
+| P0（核心） | 8 | 2025 安宁疗护实践指南、CACA 成人癌痛 V2.0、NICE NG31、WHO 癌痛指南 |
+| P1（重要） | 18 | 心理疗法指南、尊严疗法共识、多学科共同照护、症状管理系列（呼吸困难/厌食/腹泻/抑郁/睡眠） |
+| P2（补充） | 10 | 旧版指南、NCCN/ASCO 国际指南、NCI 患者教育、Cancer Council 家属支持 |
+
+> 指南多为文本层 PDF/DOCX/HTML，少数扫描页通过 easyocr 补充。2025 版国家指南由 .doc 经 LibreOffice 转换导入。
 
 ---
 
@@ -252,12 +265,12 @@ KB_DB_PATH=data/db/kb.sqlite
 | 指标 | 当前值 | 目标 | 状态 |
 |------|--------|------|------|
 | Recall@10 | 1.0 | >= 0.70 | ✅ |
-| Safety Hit Rate | 0.15 | >= 0.95 | ❌ |
+| Safety Hit Rate | 0.15 | >= 0.95 | ❌（待人工标注 contraindications） |
 | Noise Rate | 0.0 | <= 0.15 | ✅ |
-| Tag Match | 0.0 | N/A | — |
+| Tag Match | 0.79 | N/A | ✅（LLM 增强后大幅改善） |
 | Source Type Match | 1.0 | >= 0.80 | ✅ |
 | Flag Check | 1.0 | >= 0.95 | ✅ |
-| Card Target Match | 0.075 | N/A | — |
+| Card Target Match | 0.96 | N/A | ✅（3,404 张知识卡片） |
 
 ### 评测流程
 1. `scripts/discover_ground_truth.py` — 对 40 条 query 运行 dense+sparse 召回，输出候选 chunks
@@ -275,35 +288,30 @@ KB_DB_PATH=data/db/kb.sqlite
 ## 9. 已知问题与局限
 
 ### 严重
-1. **GPU 不可用**：TITAN Xp (CC 6.1) 与 PyTorch 2.12.1 (需 CC 7.5+) 不兼容。已安装 PyTorch 2.0.1+cu118 但 sentence-transformers 版本冲突，最终放弃本地 embedding/reranker
-2. **所有 chunk 标签为空**：LLM 入库增强 (`enricher.py`) 未运行，导致 semantic_tags/scenario_tags/role_tags/card_targets 均为空
-3. **无 knowledge_card**：所有单元为 semantic_chunk，无 LLM 生成的知识卡片
+1. **GPU 不可用**：TITAN Xp (CC 6.1) 与 PyTorch 2.12.1 (需 CC 7.5+) 不兼容。embedding 改用 Qwen API，reranker 改用 DeepSeek API
+2. **guideline enrichment 未完成**：6,012 条指南 chunk 中仅 32% 完成 LLM 增强（运行中，预计需数天）
 
 ### 中等
-4. **Qwen3-Embedding 本地模型闲置**：已下载至 `models/` 但无法加载（HuggingFace 不可达 + transformers 版本冲突）
-5. **Qwen3-Reranker 本地模型闲置**：同上，`reranker.py` 已实现但未集成到检索管道
-6. **仅 pdf_book 来源**：无 guideline/paper/case 等多源内容
-7. **OCR 质量**：easyocr CPU 模式识别扫描 PDF，部分文本含乱码
+3. **Safety Hit Rate 0.15**：contraindications 标签为空，已导出标注材料给护理同学人工标注
+4. **Qwen3-Embedding/Reranker 本地模型闲置**：已下载至 `models/` 但无法加载（GPU 不兼容 + HF 不可达）
+5. **OCR 质量**：easyocr CPU 模式识别扫描 PDF，部分文本含乱码
 
 ### 轻微
-8. **jieba 未安装**：sparse recall 退化为不分词模式，中文检索精度降低
-9. **/ingest/search 未实现**：自动扩充功能仅返回 not_implemented
-10. **Docker 未配置**：仅有 requirements.txt，无 Dockerfile
+6. **/ingest/search 未实现**：自动扩充功能仅返回 not_implemented
+7. **Docker 未配置**：仅有 requirements.txt，无 Dockerfile
+8. **增量索引更新**：当前仅支持全量重建
 
 ---
 
 ## 10. 待办事项（优先级排序）
 
 ### P0 — 必须完成
-- [ ] **安装兼容 PyTorch** 以启用 GPU：`torch>=2.4` 配合 `transformers>=4.43`（需 CUDA 12.x 或更换 GPU）
-  - 或：使用通义千问 API 替代本地 embedding（已实现 `Embedder("api")` 模式）
-- [ ] **运行 LLM 入库增强**：调用 `enricher.py` 为 5441 chunks 生成摘要、标签和知识卡片
+- [ ] **人工标注 contraindications**：标注材料已导出（`data/contraindication_annotation.csv` + `ANNOTATION_GUIDE.md`），等待护理同学标注后回写
 
 ### P1 — 应该完成
-- [ ] 集成 Reranker：将 `reranker.py` 加入检索管道
-- [ ] 安装 jieba：`pip install jieba` 改善中文 FTS5 召回
-- [ ] 扩展知识来源：导入 guideline、paper、case 等多源内容
-- [ ] 添加 quarantined 样本：测试 noise_rate 和 flag_check 指标
+- [ ] **完成 guideline enrichment**：运行 `python scripts/run_enrichment.py --resume` 继续增强剩余 guideline chunks
+- [ ] **重建 FAISS 索引**：guideline 导入后需重建索引以覆盖新内容
+- [ ] 安装兼容 PyTorch 以启用 GPU（或继续使用 API 方案）
 
 ### P2 — 可以完成
 - [ ] 实现 /ingest/search 自动扩充
@@ -316,11 +324,17 @@ KB_DB_PATH=data/db/kb.sqlite
 ## 11. Git 提交历史
 
 ```
+3f9d9d9 feat: import 36 clinical guidelines — 6228 new chunks
+4314350 fix: export ALL 5441 chunks for annotation, not just keyword-matched
+98e5952 fix: reranker uses sync OpenAI client + annotation export
+e1c616e feat: API-based reranker + knowledge card generation script
+f0cd0f9 feat: LLM enrichment complete — 5441/5441 chunks tagged
+2f81977 feat: LLM enrichment pipeline with DeepSeek API
+c48d92b fix: parallel import with imap_unordered, SQLite busy timeout
+f88632a fix: integrate easyocr for scanned PDFs, lazy-load jinja2 templates
 aa5aab4 feat: comprehensive eval — 40 realistic patient queries, 7 metrics, report gen
 e5826a3 feat: Qwen DashScope semantic embeddings replace TF-IDF
 7a808f1 feat: TF-IDF embedder, API retrieval pipeline working end-to-end
-c48d92b fix: parallel import with imap_unordered, SQLite busy timeout
-f88632a fix: integrate easyocr for scanned PDFs, lazy-load jinja2 templates
 56325d2 feat: complete NarrCare-KB implementation — all 7 phases
 e5c67cf feat: add database layer with SQLite schema and repository
 3549a25 feat: add Pydantic data models (KnowledgeUnit, EvidenceBundle, requests)
