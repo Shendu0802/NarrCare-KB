@@ -42,8 +42,11 @@ async def retrieve(request: RetrieveRequest):
     from src.indexing.vector_index import VectorIndex
     from src.indexing.text_index import TextIndex
 
-    embedder = Embedder(model_path="api", device=settings.embedding_device)
+    # Use TF-IDF embedder (matches current index; API embeddings unavailable)
+    embedder = Embedder(model_path="tfidf", device=settings.embedding_device)
     embedder.load()
+    vectorizer_path = settings.faiss_index_path.replace(".index", "_vectorizer.pkl")
+    embedder.load_vectorizer(vectorizer_path)
 
     vec_index = VectorIndex(index_path=settings.faiss_index_path)
     vec_index.load()
