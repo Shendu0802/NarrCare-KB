@@ -1,4 +1,41 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+.venv/
+NarrCare_KB/
+*.egg-info/
+
+# Env / secrets
 .env
+
+# Large binary / data (regenerated)
+models/
+data/db/
+data/index/
+参考资料/
+*.sqlite
+*.sqlite.bak
+
+# Runtime progress
+data/enrichment_progress.json
+data/card_progress.json
+
+# Annotation artifacts (regenerated)
+data/contraindication_annotation.csv
+
+# Eval reports (regenerated)
+data/eval/report_*.md
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.superpowers/
+.claude/
+
+# Misc
+install_deps.sh
+*.log
